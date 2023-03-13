@@ -1,0 +1,113 @@
+body {
+  font-family: 'Clash Display', sans-serif;
+  margin: 0;
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+main {
+  position: absolute;
+  color: white;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  pointer-events: none;
+  flex-direction: column;
+  justify-content: center;
+}
+.container span {
+  font-weight: 100;
+  font-size: 10vw;
+}
+.container h1 {
+  font-size: 12vw;
+  font-weight: 400;
+  line-height: 0.7em;
+  margin: 0;
+}
+.container {
+  margin-left: 5%;
+  margin-bottom: 5%;
+  width: 40%;
+  transition: all 0.8s ease-in-out;
+}
+
+.container.hidden {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.container p {
+  margin-top: 60px;
+  font-size: 28px;
+  font-weight: 100;
+  width: 80%;
+}
+
+header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100px;
+  padding: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1em;
+}
+
+header h3 {
+  color: wheat;
+  font-weight: 100;
+}
+
+header img {
+  height: 24px;
+  opacity: 0.6;
+}
+
+button {
+  background: transparent;
+  border: 1px solid white;
+  padding: 20px 40px;
+  border-radius: 50px;
+  color: white;
+  font-family: 'Clash Display';
+  letter-spacing: 0.1em;
+  margin-top: 20px;
+  pointer-events: all;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.445, 0.05, 0.55, 0.95);
+}
+
+button:hover {
+  background: white;
+  color: rgb(86, 33, 0);
+  font-family: 'Clash Display';
+  letter-spacing: 0.1em;
+  margin-top: 20px;
+}
+
+.change--material {
+  margin-right: 20px;
+}
+
+footer {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  visibility: hidden;
+  opacity: 0;
+  transition: all 0.6s ease;
+}
+
+footer.visible {
+  opacity: 1;
+  visibility: visible;
+}
