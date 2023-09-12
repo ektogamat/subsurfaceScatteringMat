@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdn.skypack.dev/three@0.150.0'
+import * as THREE from 'https://unpkg.com/three@0.150.0'
 import { OrbitControls } from 'https://unpkg.com/three@0.150.0/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'https://unpkg.com/three@0.150.0/examples/jsm/loaders/GLTFLoader.js'
 import { GUI } from 'https://unpkg.com/three@0.150.0/examples/jsm/libs/lil-gui.module.min.js'
@@ -13,7 +13,7 @@ import {
     VignetteEffect,
     HueSaturationEffect,
     SMAAEffect,
-} from 'https://unpkg.com/postprocessing@6.30.1/build/postprocessing.esm.js'
+} from 'https://unpkg.com/browse/postprocessing@6.30.1/build/postprocessing.esm.js'
 import { MeshTranslucentMaterial } from './TranslucentMaterial.js'
 import { DRACOLoader } from 'https://unpkg.com/three@0.150.0/examples/jsm/loaders/DRACOLoader.js'
 // import { Stats } from "./stats.js";
@@ -42,7 +42,7 @@ async function main() {
     })
 
     renderer.setSize(clientWidth, clientHeight)
-    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
     renderer.outputEncoding = THREE.sRGBEncoding
     renderer.toneMapping = THREE.LinearToneMapping
     document.body.appendChild(renderer.domElement)
@@ -54,6 +54,8 @@ async function main() {
         const clientWidth = window.innerWidth
         const clientHeight = window.innerHeight
         renderer.setSize(clientWidth, clientHeight)
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
+
         camera.aspect = clientWidth / clientHeight
         camera.updateProjectionMatrix()
     })
@@ -66,11 +68,11 @@ async function main() {
     controls.enablePan = false
     controls.minDistance = 8
     controls.maxDistance = 17
-    controls.maxPolarAngle = Math.PI / 2.2
+    controls.maxPolarAngle = Math.PI / 2.1
 
     // Setup Environment
     let environment
-    new RGBELoader().load('https://cdn.glitch.global/df35b9e1-0fa8-49d1-b430-bed29251dfb5/gem_2.hdr?v=1675257556766', function (texture) {
+    new RGBELoader().load('gem_2.hdr', function (texture) {
         texture.mapping = THREE.EquirectangularReflectionMapping
         scene.environment = texture
         environment = texture
@@ -129,14 +131,13 @@ async function main() {
     scene.add(pointLight3)
 
     // Define variables for the flicker effect
-    var baseIntensity = 2
-    var frequency = 9
+    var baseIntensity = 2.4
+    var frequency = 0.2
     var amplitude = 0.5
 
     // Define variables for random variations
-    var intensityRange = 0.1
-    var positionRange = 0.01
-
+    var intensityRange = 0.6
+    
     function updateLightIntensity(time) {
         // Update intensity based on sine function
         var intensity = baseIntensity + amplitude * Math.sin(frequency * time * 0.002)
@@ -148,20 +149,30 @@ async function main() {
         pointLight.intensity = intensity
         pointLight2.intensity = intensity
         pointLight3.intensity = intensity2
-
-        // Add random variation to light position
-        var positionOffset = new THREE.Vector3(Math.random() * positionRange - positionRange / 2, 0, Math.random() * positionRange - positionRange / 2)
-        var positionOffset2 = new THREE.Vector3(Math.random() * positionRange - positionRange / 2, 0, Math.random() * positionRange - positionRange / 2)
-        pointLight.position.add(positionOffset)
-        pointLight2.position.add(positionOffset)
-        pointLight3.position.add(positionOffset2)
     }
 
 
+    const translucentWaxMaterial = new MeshTranslucentMaterial({
+        side: THREE.DoubleSide,
+        envMap: environment,
+        transmission: 0.6,
+        roughness: 1,
+        internalRoughness: 0.72,
+        ior: 1.9,
+        attenuationColor: new THREE.Color('#fff5db'),
+        attenuationDistance: 0.03,
+        dithering: true,
+        thickness: 2.0,
+        scattering: 0.3,
+        roughnessBlurScale: 30,
+        scatteringAbsorption: 1.0,
+    })
+
     /////////////////////////////////////////////////////////////////////////
     ///// LOADING GLB/GLTF MODEL FROM BLENDER
-    let translucentMesh
-    let flame
+    let translucentMesh, flameMesh, flameMesh2
+    let flame, myMaterial, myMaterial2
+    let wax1, wax2, wax3, waxCopy1, waxCopy2, waxCopy3
     loader.load('candles.glb', function (gltf) {
         gltf.scene.traverse((obj) => {
             if (obj.isMesh) {
@@ -178,140 +189,106 @@ async function main() {
                         shader.uniforms.time = { value: 0 }
 
                         shader.vertexShader = `
-            uniform float time;
-            varying vec4 vMvPosition;
-            //    Classic Perlin 2D Noise 
-            //    by Stefan Gustavson
-            //
-            vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
-            vec2 fade(vec2 t) {return t*t*t*(t*(t*6.0-15.0)+10.0);}
-            
-            float getClassicNoise2d(vec2 P)
-            {
-                    vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);
-                vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);
-                Pi = mod(Pi, 289.0); // To avoid truncation effects in permutation
-                vec4 ix = Pi.xzxz;
-                vec4 iy = Pi.yyww;
-                vec4 fx = Pf.xzxz;
-                vec4 fy = Pf.yyww;
-                vec4 i = permute(permute(ix) + iy);
-                vec4 gx = 2.0 * fract(i * 0.0243902439) - 1.0; // 1/41 = 0.024...
-                vec4 gy = abs(gx) - 0.5;
-                vec4 tx = floor(gx + 0.5);
-                gx = gx - tx;
-                vec2 g00 = vec2(gx.x,gy.x);
-                vec2 g10 = vec2(gx.y,gy.y);
-                vec2 g01 = vec2(gx.z,gy.z);
-                vec2 g11 = vec2(gx.w,gy.w);
-                vec4 norm = 1.79284291400159 - 0.85373472095314 * 
-                vec4(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11));
-                g00 *= norm.x;
-                g01 *= norm.y;
-                g10 *= norm.z;
-                g11 *= norm.w;
-                float n00 = dot(g00, vec2(fx.x, fy.x));
-                float n10 = dot(g10, vec2(fx.y, fy.y));
-                float n01 = dot(g01, vec2(fx.z, fy.z));
-                float n11 = dot(g11, vec2(fx.w, fy.w));
-                vec2 fade_xy = fade(Pf.xy);
-                vec2 n_x = mix(vec2(n00, n01), vec2(n10, n11), fade_xy.x);
-                float n_xy = mix(n_x.x, n_x.y, fade_xy.y);
-                return 2.3 * n_xy;
-            }                
+                            uniform float time;
+                            varying vec4 vMvPosition;
+                            //    Classic Perlin 2D Noise 
+                            //    by Stefan Gustavson
+                            //
+                            vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+                            vec2 fade(vec2 t) {return t*t*t*(t*(t*6.0-15.0)+10.0);}
+                            
+                            float getClassicNoise2d(vec2 P)
+                            {
+                                    vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);
+                                vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);
+                                Pi = mod(Pi, 289.0); // To avoid truncation effects in permutation
+                                vec4 ix = Pi.xzxz;
+                                vec4 iy = Pi.yyww;
+                                vec4 fx = Pf.xzxz;
+                                vec4 fy = Pf.yyww;
+                                vec4 i = permute(permute(ix) + iy);
+                                vec4 gx = 2.0 * fract(i * 0.0243902439) - 1.0; // 1/41 = 0.024...
+                                vec4 gy = abs(gx) - 0.5;
+                                vec4 tx = floor(gx + 0.5);
+                                gx = gx - tx;
+                                vec2 g00 = vec2(gx.x,gy.x);
+                                vec2 g10 = vec2(gx.y,gy.y);
+                                vec2 g01 = vec2(gx.z,gy.z);
+                                vec2 g11 = vec2(gx.w,gy.w);
+                                vec4 norm = 1.79284291400159 - 0.85373472095314 * 
+                                vec4(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11));
+                                g00 *= norm.x;
+                                g01 *= norm.y;
+                                g10 *= norm.z;
+                                g11 *= norm.w;
+                                float n00 = dot(g00, vec2(fx.x, fy.x));
+                                float n10 = dot(g10, vec2(fx.y, fy.y));
+                                float n01 = dot(g01, vec2(fx.z, fy.z));
+                                float n11 = dot(g11, vec2(fx.w, fy.w));
+                                vec2 fade_xy = fade(Pf.xy);
+                                vec2 n_x = mix(vec2(n00, n01), vec2(n10, n11), fade_xy.x);
+                                float n_xy = mix(n_x.x, n_x.y, fade_xy.y);
+                                return 2.3 * n_xy;
+                            }                
 
-            ${shader.vertexShader}`.replace(
-                            `#include <project_vertex>`,
+                            ${shader.vertexShader}`.replace(
+                                            `#include <project_vertex>`,
+                                            `
+                            vec4 mvPosition = vec4( transformed, 1.0 );
+
+                            #ifdef USE_INSTANCING
+
+                                mvPosition = instanceMatrix * mvPosition;
+
+                            #endif
+                        
+                            mvPosition = modelMatrix * mvPosition;
+                        
+                            // Wind
+                            float windNoise = getClassicNoise2d(mvPosition.xz * 0.9 + vec2(time * 0.5, time * 0.9));
+                            float windStrength = (1.0 - uv.y) * windNoise;
+                            mvPosition.z += max(0.0, (.5 + uv.y) - 0.8) * windStrength * 0.95;
+                        
+                            mvPosition = viewMatrix * mvPosition;
+                        
+                            gl_Position = projectionMatrix * mvPosition;
+
+                            vMvPosition = mvPosition;
+                        
+                            #include <logdepthbuf_vertex>
+                            #include <clipping_planes_vertex>
+                            #include <fog_vertex>
+
                             `
-            vec4 mvPosition = vec4( transformed, 1.0 );
-
-            #ifdef USE_INSTANCING
-
-                mvPosition = instanceMatrix * mvPosition;
-
-            #endif
-        
-            mvPosition = modelMatrix * mvPosition;
-        
-            // Wind
-            float windNoise = getClassicNoise2d(mvPosition.xz * 0.9 + vec2(time * 0.5, time * 0.9));
-            float windStrength = (1.0 - uv.y) * windNoise;
-            mvPosition.z += max(0.0, (.5 + uv.y) - 0.8) * windStrength * 0.95;
-        
-            mvPosition = viewMatrix * mvPosition;
-        
-            gl_Position = projectionMatrix * mvPosition;
-
-            vMvPosition = mvPosition;
-        
-            #include <logdepthbuf_vertex>
-            #include <clipping_planes_vertex>
-            #include <fog_vertex>
-
-            `
                         )
 
                         obj.material.userData.shader = shader
                     }
+
                 }
 
                 if (obj.name === 'Wax') {
-                    obj.material = new MeshTranslucentMaterial({
-                        side: THREE.DoubleSide,
-                        envMap: environment,
-                        transmission: 0.6,
-                        roughness: 1,
-                        internalRoughness: 0.72,
-                        ior: 2.9,
-                        attenuationColor: new THREE.Color('#fff5db'),
-                        attenuationDistance: 0.03,
-                        dithering: true,
-                        thickness: 2.0,
-                        scattering: 0.63,
-                        roughnessBlurScale: 30,
-                        scatteringAbsorption: 1.0,
-                    })
+
+                    obj.material = translucentWaxMaterial
+
+                    wax1 = obj
                     obj.castShadow = true
                     obj.receiveShadow = true
                 }
 
                 if (obj.name === 'Wax001') {
-                    obj.material = new MeshTranslucentMaterial({
-                        side: THREE.DoubleSide,
-                        envMap: environment,
-                        transmission: 0.6,
-                        roughness: 1,
-                        internalRoughness: 0.72,
-                        ior: 2.9,
-                        attenuationColor: new THREE.Color('#fff5db'),
-                        attenuationDistance: 0.03,
-                        dithering: true,
-                        thickness: 2.0,
-                        scattering: 0.63,
-                        roughnessBlurScale: 30,
-                        scatteringAbsorption: 1.0,
-                    })
+                    wax2 = obj
+                    
+                    obj.material =translucentWaxMaterial
                     translucentMesh = obj
                     obj.castShadow = true
                     obj.receiveShadow = true
                 }
 
                 if (obj.name === 'Cube') {
-                    obj.material = new MeshTranslucentMaterial({
-                        side: THREE.DoubleSide,
-                        envMap: environment,
-                        transmission: 0.6,
-                        roughness: 1,
-                        internalRoughness: 0.72,
-                        ior: 2.9,
-                        attenuationColor: new THREE.Color('#fff5db'),
-                        attenuationDistance: 0.03,
-                        dithering: true,
-                        thickness: 2.0,
-                        scattering: 0.63,
-                        roughnessBlurScale: 30,
-                        scatteringAbsorption: 1.0,
-                    })
+                    wax3 = obj
+
+                    obj.material = translucentWaxMaterial
                     obj.castShadow = true
                     obj.receiveShadow = true
                 }
@@ -343,8 +320,24 @@ async function main() {
 
         setTimeout(() =>{
             container.classList.remove('hidden')
-    
+            scene.add(createWaxCopy(wax1.geometry, wax1.parent.position, 'waxCopy1'))
+            scene.add(createWaxCopy(wax2.geometry, wax2.parent.position, 'waxCopy2'))
+            scene.add(createWaxCopy(wax3.geometry, wax3.parent.position, 'waxCopy3'))
         }, 2000)
+
+        function createWaxCopy(geometry, position, objName){
+            const waxCopyMesh = new THREE.Mesh(
+                geometry, new THREE.MeshPhysicalMaterial({side: THREE.DoubleSide, transmission: 0.5, envMapIntensity: 0.7 })
+            )
+            waxCopyMesh.position.set(position.x, position.y, position.z)
+            waxCopyMesh.castShadow = true
+
+            waxCopyMesh.name = objName
+
+            waxCopyMesh.visible = false
+
+            return waxCopyMesh 
+        }
     })
 
     const clock = new THREE.Clock()
@@ -427,15 +420,20 @@ async function main() {
 
 
     // Interface stuff
+    let toggle = false
     const exploreButton = document.querySelector('.explore')
     const container = document.querySelector('.container')
-    const exitButton = document.querySelector('.exit')
+    const exit = document.querySelector('.exit')
+    const exitButton = document.querySelector('.exit--button')
+    const changeMaterial = document.querySelector('.change--material')
+    const changeColors = document.querySelector('.change--colors')
+    const materialName = document.querySelector('.material--name')
 
 
     exploreButton.addEventListener('click', () => {
         animateCamera(10, 2.5, -8.44, 0, 0, 0)
         container.classList.add('hidden')
-        exitButton.classList.add('visible')
+        exit.classList.add('visible')
         controls.enableRotate = true
         controls.enabled = true
     })
@@ -443,10 +441,32 @@ async function main() {
     exitButton.addEventListener('click', () => {
         animateCamera(10, 2.5, -9.44, 2.33, 1.23, 1.72)
         container.classList.remove('hidden')
-        exitButton.classList.remove('visible')
+        exit.classList.remove('visible')
         controls.enableRotate = false
-        controls.maxPolarAngle = Math.PI
         controls.enabled = false
+    })
+
+    changeColors.addEventListener('click', () => {
+        const newColor = new THREE.Color().setHSL(Math.random(), 0.8, 0.3);
+        wax1.material.color = newColor
+        wax1.material.attenuationColor = newColor
+        wax1.material.needsUpdate = true
+    })
+
+    changeMaterial.addEventListener('click', () => {
+        scene.getObjectByName( "waxCopy1", true ).visible = !toggle
+        scene.getObjectByName( "waxCopy2", true ).visible = !toggle
+        scene.getObjectByName( "waxCopy3", true ).visible = !toggle
+        wax1.visible = toggle
+        wax2.visible = toggle
+        wax3.visible = toggle
+        toggle = !toggle
+
+        if(toggle){
+            materialName.innerHTML = 'Now using MeshPhysicalMaterial'
+        } else{
+            materialName.innerHTML = 'Three.js MeshTranslucentMaterial'
+        }
     })
 
 

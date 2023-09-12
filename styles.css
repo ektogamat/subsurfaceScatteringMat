@@ -43,7 +43,7 @@ main {
 
 .container p {
   margin-top: 60px;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 100;
   width: 80%;
 }
@@ -94,6 +94,10 @@ button:hover {
 }
 
 .change--material {
+  margin-right: 20px;
+}
+
+.change--colors {
   margin-right: 20px;
 }
 

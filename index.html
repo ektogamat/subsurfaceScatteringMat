@@ -18,18 +18,22 @@
 
     <header>
       <img src="logo.svg" />
-      <h3>Three.js & Candles Co.</h3>
+      <h3 class="material--name">Three.js MeshTranslucentMaterial</h3>
     </header>
     <main>
       <div class="container hidden">
         <h1><span>Realistic</span> Candles</h1>
-        <p>Thanks to the new MeshTranslucentMaterial, now we can have a realistic wax material with transparency calculated</p>
+        <p>
+          Thanks to the new MeshTranslucentMaterial, now we can have a realistic wax material with subsurface scattering. It is a drop-in replacement
+          for MeshPhysicalMaterial.
+        </p>
         <button class="explore">EXPLORE</button>
       </div>
     </main>
     <footer class="exit">
-      <button class="change--material">SEE THE DEFAULT MATERIAL</button>
-      <button>EXIT</button>
+      <button class="change--material">Toggle material</button>
+      <button class="change--colors">Change Colors</button>
+      <button class="exit--button">Exit</button>
     </footer>
     <script type="module" src="main.js"></script>
   </body>
